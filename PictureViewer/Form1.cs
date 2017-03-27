@@ -686,6 +686,15 @@ namespace PictureViewer
             int group = 255 / (K-1);
             List<double> diffuseLevels = new List<double>();
             int value = 0;
+
+            if(K == 2)
+            {
+                diffuseLevels.Add(0);
+                diffuseLevels.Add(128);
+                diffuseLevels.Add(255);
+                return diffuseLevels;
+            }
+
             while (value <= 255)
             {
                 diffuseLevels.Add(value);
@@ -739,7 +748,23 @@ namespace PictureViewer
         }
 
 
+        public int findSecondClosestValueIndex(int closestindex,int Value, List<double> Range)
+        {
+            int closestvalueDistance = (int)Math.Abs(Range[closestindex] - Value);
+            
+            int minusOne = (int)Math.Abs(Range[closestindex - 1] - Value);
+            int plusOne = (int)Math.Abs(Range[closestindex + 1] - Value);
 
+            if(minusOne < plusOne)
+            {
+                return (closestindex - 1);
+            }
+            else
+                return (closestindex + 1);
+
+
+
+        }
         
 
         public int findCubeColorMidValue(int Value, List<double> Range)
@@ -747,35 +772,34 @@ namespace PictureViewer
 
             int closestcolorindex = findClosestValueIndex(Value, Range);
             double result = 0;
+            int firstPoint = 0;
+            int secondPoint = 255;
 
-            if (Value < Range[closestcolorindex])
-            {
-
-                if (Value == 0)
+           
+                if (closestcolorindex == 0)
                 {
-                    result = (Range[0] + Range[1])/2;
+                    result = (Range[0] + Range[1]) / 2;
+                    return (int)result;
+                }
+                if (closestcolorindex == Range.Count() - 1)
+                {
+                    result = (Range[Range.Count - 1] + Range[Range.Count - 2]) / 2;
                     return (int)result;
                 }
                 else
-                    result = (Range[closestcolorindex - 1] + Range[closestcolorindex])/2;
-            }
-            if (Value >= Range[closestcolorindex])
-            {
-                if (Value == 255)
                 {
-                    result = (Range[Range.Count - 1] + Range[Range.Count - 2])/2;
-                    return (int)result;
+                    firstPoint = closestcolorindex;
+                    secondPoint = findSecondClosestValueIndex(closestcolorindex, Value , Range);
+                    result = (Range[firstPoint] + Range[secondPoint]) / 2;
                 }
-                else
-                    result = (Range[closestcolorindex] + Range[closestcolorindex + 1])/2;
-
-            }
+            
 
 
 
             return (int)result;
 
         }
+
 
 
 
@@ -797,11 +821,13 @@ namespace PictureViewer
                     int Gvalue = bmp.GetPixel(x, y).G;
                     int Bvalue = bmp.GetPixel(x, y).B;
 
-                    Rvalue = (int)findClosestValue(Rvalue, Rpallet);
-                    Gvalue = (int)findClosestValue(Gvalue, Gpallet);
-                    Bvalue = (int)findClosestValue(Bvalue, Bpallet);
+                    int newRvalue = (int)findCubeColorMidValue(Rvalue, Rpallet);
+                    int newGvalue = (int)findCubeColorMidValue(Gvalue, Gpallet);
+                    int newBvalue = (int)findCubeColorMidValue(Bvalue, Bpallet);
+                    
 
-                    bmp.SetPixel(x, y, Color.FromArgb(bmp.GetPixel(x, y).A, Rvalue, Gvalue, Bvalue));
+
+                    bmp.SetPixel(x,y,Color.FromArgb(temppixel.A,newRvalue,newGvalue,newBvalue));
                     
                 }
             }
@@ -853,7 +879,7 @@ namespace PictureViewer
             Bitmap d = new Bitmap(image.Width, image.Height);
             int filterX = (int)Math.Floor((double)diffusionMatrix.Count()/2)  ;
             int filterY =(int)Math.Floor((double)diffusionMatrix[0].Count()/2) ;
-            int levels = 2;
+            int levels = 4;
             float error = 0 ;
             List<double> thresholdingLevels = findNewRange(levels);
         
@@ -879,7 +905,7 @@ namespace PictureViewer
                             int correspondingXFilter = i + filterX;
                             int correspondingYFilter = j + filterY;
 
-                            if (correspondingXFilter >= 0 && correspondingYFilter >= 0 && diffusionMatrix[correspondingXFilter][correspondingYFilter]!= 0)
+                            if (correspondingXFilter >= 0 && correspondingYFilter >= 0)
                             {
                                 if (correspondingXIndex >= 0 && correspondingXIndex <= bmp.Width - 1 && correspondingYIndex >= 0 && correspondingYIndex <= bmp.Height - 1)
                                 {
