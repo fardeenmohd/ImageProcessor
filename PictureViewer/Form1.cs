@@ -25,8 +25,8 @@ namespace PictureViewer
         public List<List<float>> diffusionFilter = new List<List<float>>
         {
             new List<float> {0 , 0 , 0 },
-            new List<float> {0 , 0 , 7/16 },
-            new List<float> { 3/16 , 5/16, 1/16 }
+            new List<float> {0 , 0 , 7/16f },
+            new List<float> { 3/16f , 5/16f, 1/16f }
         };
 
 
@@ -687,10 +687,10 @@ namespace PictureViewer
             List<double> diffuseLevels = new List<double>();
             int value = 0;
 
-            if(K == 2)
+            if (K == 2)
             {
                 diffuseLevels.Add(0);
-                diffuseLevels.Add(128);
+                
                 diffuseLevels.Add(255);
                 return diffuseLevels;
             }
@@ -835,55 +835,48 @@ namespace PictureViewer
             return bmp;
             
         }
-        public float findThresholdedValue(int Value, List<double> Range, double T)
+
+        //--------------------- Corrected Thresholding -----------------
+        public float findThresholdedValue(int Value, int levels, double T)
         {
+            int result = 0;
+            List<int> levelValues = new List<int>();
+            List<int> thresholds = new List<int>();
 
-            int closestcolorindex = findClosestValueIndex(Value, Range);
-            double result = 0;
 
-            if (Value < Range[closestcolorindex])
+
+            for (int i = 0; i < levels; i++)
+                levelValues.Add( (int)((255.0 / (levels - 1)) * i));
+            
+            for (int i = 0; i < levels - 1; i++)
+                thresholds.Add( (int)(levelValues[i] + T * (levelValues[i + 1] - levelValues[i])));
+
+            for (int i = 0; i < levels - 1; i++)
             {
-
-                if (Value == 0)
+                if (thresholds[i] >= Value)
                 {
-                    result = Range[0] + T * Range[1];
-                    return (int)result;
+                    result =  levelValues[i];
+                    
                 }
-                else
-                    result = Range[closestcolorindex - 1] + T * Range[closestcolorindex];
+                else if (levels == 2)
+                    result =  255;
             }
-            else if (Value >= Range[closestcolorindex])
-            {
-                if (Value == 255)
-                {
-                    result = Range[Range.Count - 1] + T * Range[Range.Count - 2];
-                    return (int)result;
-                }
-                else
-                    result = Range[closestcolorindex] + T * Range[closestcolorindex + 1];
-
-            }
-
-
-
-            return (float)result;
-
-
-
+            return result;
+            
         }
-
-       
+        // -------------------------  error Diffusion ----------------
+      
         public Bitmap errorDiffusion(Image image , List<List<float>> diffusionMatrix)
         {
             Bitmap bmp = (Bitmap)image; 
             Bitmap d = new Bitmap(image.Width, image.Height);
             int filterX = (int)Math.Floor((double)diffusionMatrix.Count()/2)  ;
             int filterY =(int)Math.Floor((double)diffusionMatrix[0].Count()/2) ;
-            int levels = 4;
-            float error = 0 ;
-            List<double> thresholdingLevels = findNewRange(levels);
-        
+            int levels = 2;//no of colours you want 
             
+            List<double> thresholdingLevels = findNewRange(levels);
+            float error = 0f;
+
 
             for (int x = 0; x < bmp.Width; x++)
             {
@@ -891,32 +884,33 @@ namespace PictureViewer
                 {
                     Color currentPixel = bmp.GetPixel(x, y);
                     float intensity = currentPixel.R;
-                    float K = findThresholdedValue(currentPixel.R, thresholdingLevels, 0.5);
-                    d.SetPixel(x, y, Color.FromArgb(currentPixel.A, wrap((int)K,0,255),wrap((int)K,0,255), wrap((int)K,0,255)));
-                    error = currentPixel.R - K;
+                    float K = findThresholdedValue(currentPixel.R, levels ,0.5);
+                    error = currentPixel.R - K ;
 
-                    for (int i = (int)-filterX; i <= filterX; i++)
+                    d.SetPixel(x, y, Color.FromArgb(currentPixel.A, wrap((int)K, 0, 255), wrap((int)K, 0, 255), wrap((int)K, 0, 255)));
+                    for (int i = -filterX; i <= filterX; i++)
                     {
-                        for (int j = (int)-filterY; j <= filterY; j++)
+
+                        for (int j = -filterY; j <= filterY; j++)
                         {
 
-                            int correspondingXIndex = x + i ;
-                            int correspondingYIndex = y + j ;
+                            int correspondingXIndex = x + i;
                             int correspondingXFilter = i + filterX;
+
+                            int correspondingYIndex = y + j ;
                             int correspondingYFilter = j + filterY;
 
-                            if (correspondingXFilter >= 0 && correspondingYFilter >= 0)
-                            {
+                            
                                 if (correspondingXIndex >= 0 && correspondingXIndex <= bmp.Width - 1 && correspondingYIndex >= 0 && correspondingYIndex <= bmp.Height - 1)
                                 {
                                     Color tempPixel = bmp.GetPixel(correspondingXIndex, correspondingYIndex);
                                     float currentValue = tempPixel.R;
                                     currentValue += error * (diffusionMatrix[correspondingXFilter][correspondingYFilter]);
+                   
                                     Color diffusedColor = Color.FromArgb(tempPixel.A, wrap((int)currentValue,0,255), wrap((int)currentValue, 0, 255), wrap((int)currentValue, 0, 255));
                                     bmp.SetPixel(correspondingXIndex, correspondingYIndex, diffusedColor);
                                 }
-
-
+                                
                                 else if (correspondingXIndex < 0 && correspondingYIndex < 0)
                                 {
                                     Color tempPixel = bmp.GetPixel(0, 0);
@@ -996,7 +990,7 @@ namespace PictureViewer
                                     bmp.SetPixel(correspondingXIndex, bmp.Height - 1, diffusedColor);
 
                                 }
-                            }
+                            
                             
 
                         }
@@ -1031,7 +1025,7 @@ namespace PictureViewer
                     int currentIntensity = (oc.R);
                     int grayscale = 0;
 
-                    grayscale = (int)findThresholdedValue(currentIntensity, Range, threshold);
+                    grayscale = (int)findThresholdedValue(currentIntensity,  m , threshold);
 
 
                     Color nc = Color.FromArgb(oc.A, wrap(grayscale, 0, 255), wrap(grayscale, 0, 255), wrap(grayscale, 0, 255));
@@ -1086,24 +1080,24 @@ namespace PictureViewer
                     diffusionFilter.Clear();
                     diffusionFilter = new List<List<float>> {
                                                    new List<float> { 0, 0, 0 },
-                                                   new List<float> { 0, 0, 7/16 },
-                                                   new List<float> { 3/16, 5/16, 1/16 } };
+                                                   new List<float> { 0, 0, 7/16f },
+                                                   new List<float> { 3/16f, 5/16f, 1/16f } };
                     break;
                 case "Burkes":
                     diffusionFilter.Clear();
                     diffusionFilter = new List<List<float>> {
                                                    new List<float> { 0 , 0 , 0 , 0 , 0 },
-                                                   new List<float> { 0 , 0 , 0 , 8/32 , 4/32 },
-                                                   new List<float> { 2/32 , 4/32 , 8/32 , 4/32 , 2/32 } };
+                                                   new List<float> { 0 , 0 , 0 , 8/32f , 4/32f },
+                                                   new List<float> { 2/32f , 4/32f , 8/32f , 4/32f , 2/32f } };
                     break;
                 case "Stucky":
                     diffusionFilter.Clear();
                     diffusionFilter = new List<List<float>> {
                                                    new List<float> { 0,  0 , 0 , 0 , 0 },
                                                    new List<float> { 0 , 0 , 0 , 0 , 0 },
-                                                   new List<float> { 0 , 0 , 0 , 8 / 42 , 4 / 42 },
-                                                   new List<float> { 2/42 , 4/42 , 8/42 , 4/42 , 2/42 },
-                                                   new List<float> { 1 / 42, 2 / 42, 4 / 42, 2 / 42, 1 / 42 }};
+                                                   new List<float> { 0 , 0 , 0 , 8 / 42f , 4/42f },
+                                                   new List<float> { 2/42f , 4/42f , 8/42f , 4/42f , 2/42f },
+                                                   new List<float> { 1 / 42f, 2 / 42f, 4 / 42f, 2 / 42f, 1 / 42f }};
                     break;
                 case "Sierra":
 
@@ -1111,9 +1105,9 @@ namespace PictureViewer
                     diffusionFilter = new List<List<float>> {
                                                             new List<float> { 0 , 0 , 0 , 0 , 0 },
                                                             new List<float> { 0 , 0 , 0 , 0 , 0 },
-                                                            new List<float> { 0 , 0 , 0 , 5 / 32 , 3 / 32 },
-                                                            new List<float> { 2 / 32, 4 / 32, 8 / 32,4 / 32,2 / 32 },
-                                                            new List<float> { 1 / 42, 2 / 42, 4 / 42, 2 / 42, 1 / 42 }};
+                                                            new List<float> { 0 , 0 , 0 , 5 / 32f , 3 / 32f },
+                                                            new List<float> { 2 / 32f, 4 / 32f, 8 / 32f,4 / 32f,2 / 32f },
+                                                            new List<float> { 1 / 42f, 2 / 42f, 4 / 42f, 2 / 42f, 1 / 42f }};
                     break;
                 case "Atkinson":
 
@@ -1121,9 +1115,9 @@ namespace PictureViewer
                     diffusionFilter = new List<List<float>> {
                                                             new List<float> { 0 , 0 , 0 , 0 , 0 },
                                                             new List<float> { 0 , 0 , 0 , 0 , 0 },
-                                                            new List<float> { 0 , 0 , 0 , 1 / 8 , 1 / 8 },
-                                                            new List<float> { 0 , 1 / 8 , 1 / 8,1 / 8, 0 },
-                                                            new List<float> { 0, 0, 1 / 8, 0, 0 }};
+                                                            new List<float> { 0 , 0 , 0 , 1 / 8f , 1 / 8f },
+                                                            new List<float> { 0 , 1 / 8f , 1 / 8f,1 / 8f, 0 },
+                                                            new List<float> { 0, 0, 1 / 8f, 0, 0 }};
                     break;
 
 
@@ -1139,7 +1133,8 @@ namespace PictureViewer
             int RK = Convert.ToInt32(textBox5.Text);
             int BK = Convert.ToInt32(textBox7.Text);
             int GK = Convert.ToInt32(textBox6.Text);
-            pictureBox1.Image= quantizeImage(bmp,RK,GK,BK);
+            Bitmap temp = quantizeImage(bmp,RK,GK,BK);
+            pictureBox1.Image = temp;
         }
 
        
